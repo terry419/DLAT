@@ -1,28 +1,52 @@
+// InputManager.cs
 using UnityEngine;
 using UnityEngine.Events;
 
 public class InputManager : MonoBehaviour
 {
-    // 이벤트로 입력을 분리하면 나중에 각 컨트롤러가 구독(subscribe)할 수 있습니다.
-    public UnityEvent OnSubmit;   // Enter 또는 A 버튼
-    public UnityEvent OnCancel;   // ESC 또는 B 버튼
-    public UnityEvent<Vector2> OnMove; // WASD/화살표 입력 벡터
+    // 이벤트 인스턴스화 (널 체크 불필요)
+    public UnityEvent<Vector2> OnMove = new UnityEvent<Vector2>();
+    public UnityEvent OnSubmit = new UnityEvent();  // “확인/선택” 이벤트
+    public UnityEvent OnCancel = new UnityEvent();  // “취소/뒤로” 이벤트
+
+    [Header("입력 버퍼 (초)")]
+    public float inputBuffer = 0.1f;
+    [Header("반복 입력 간격 (초)")]
+    public float repeatRate = 0.12f;
+
+    private float lastMoveTime;
+    private float lastSubmitTime;
+    private float lastCancelTime;
 
     void Update()
     {
-        // 1. 이동 입력: WASD 또는 화살표 키
-        float h = Input.GetAxisRaw("Horizontal"); // A/D or ←/→
-        float v = Input.GetAxisRaw("Vertical");   // W/S or ↑/↓
-        Vector2 moveVector = new Vector2(h, v).normalized;
-        if (moveVector != Vector2.zero)
-            OnMove?.Invoke(moveVector); // 구독자에 이동 방향 전달
+        float now = Time.time;
 
-        // 2. 확인/선택: Enter 키 또는 콘솔 A 버튼
-        if (Input.GetKeyDown(KeyCode.Return) || Input.GetButtonDown("Submit"))
-            OnSubmit?.Invoke();
+        // 이동 입력 (가변 입력을 즉시 반영하되 버퍼링 적용)
+        Vector2 move = new Vector2(
+            Input.GetAxisRaw("Horizontal"),
+            Input.GetAxisRaw("Vertical")
+        );
+        if (move != Vector2.zero && now - lastMoveTime >= inputBuffer)
+        {
+            OnMove.Invoke(move.normalized);
+            lastMoveTime = now;
+        }
 
-        // 3. 취소/뒤로: ESC 키 또는 콘솔 B 버튼
-        if (Input.GetKeyDown(KeyCode.Escape) || Input.GetButtonDown("Cancel"))
-            OnCancel?.Invoke();
+        // 확인/공격 입력: Enter 키 OR 매핑된 “Submit” 버튼
+        if ((Input.GetKeyDown(KeyCode.Return) || Input.GetButtonDown("Submit"))  // 변경: 키보드 A 대신 GetButtonDown("Submit") 사용
+            && now - lastSubmitTime >= repeatRate)
+        {
+            OnSubmit.Invoke();
+            lastSubmitTime = now;
+        }
+
+        // 취소/뒤로 입력: ESC 키 OR 매핑된 “Cancel” 버튼
+        if ((Input.GetKeyDown(KeyCode.Escape) || Input.GetButtonDown("Cancel"))  // 변경: 키보드 B 대신 GetButtonDown("Cancel") 사용
+            && now - lastCancelTime >= repeatRate)
+        {
+            OnCancel.Invoke();
+            lastCancelTime = now;
+        }
     }
 }
